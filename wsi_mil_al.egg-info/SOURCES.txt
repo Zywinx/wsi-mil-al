@@ -1,0 +1,11 @@
+pyproject.toml
+wsi_mil/__init__.py
+wsi_mil/datasets/__init__.py
+wsi_mil/datasets/bag_dataset.py
+wsi_mil/utils/__init__.py
+wsi_mil/utils/io.py
+wsi_mil/utils/seed.py
+wsi_mil_al.egg-info/PKG-INFO
+wsi_mil_al.egg-info/SOURCES.txt
+wsi_mil_al.egg-info/dependency_links.txt
+wsi_mil_al.egg-info/top_level.txt

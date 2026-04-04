@@ -1,0 +1,25 @@
+experiment:
+  name: stage1_baseline
+  out_dir: runs/stage1_baseline_seed11
+  seed: 11
+
+data:
+  splits_csv: data/metadata/splits_patient.csv
+  bag_index_json: data/metadata/bag_index.json
+  img_size: 224
+  bag_size: 256
+  num_workers: 4
+
+model:
+  embed_dim: 512
+  attn_dim: 256
+  encoder_pretrained: true
+  encoder_dropout: 0.0
+  mil_dropout: 0.25
+
+train:
+  epochs: 10
+  batch_size: 1
+  lr: 0.0002
+  weight_decay: 0.0001
+  amp: true

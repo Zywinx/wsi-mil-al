@@ -1,0 +1,147 @@
+import argparse
+import json
+import math
+from pathlib import Path
+
+import cv2
+import numpy as np
+import pandas as pd
+from PIL import Image
+import openslide
+from tqdm import tqdm
+
+def safe_mkdir(p: Path):
+    p.mkdir(parents=True, exist_ok=True)
+
+def compute_tissue_mask(slide: openslide.OpenSlide, max_dim: int = 2048):
+    w, h = slide.dimensions
+    scale = max(w, h) / max_dim if max(w, h) > max_dim else 1.0
+    thumb_w, thumb_h = int(w / scale), int(h / scale)
+    thumb = slide.get_thumbnail((thumb_w, thumb_h))
+    img = np.array(thumb.convert("RGB"))  # [H,W,3]
+
+    # HSV saturation mask
+    hsv = cv2.cvtColor(img, cv2.COLOR_RGB2HSV)
+    sat = hsv[:, :, 1]
+    sat_blur = cv2.GaussianBlur(sat, (5, 5), 0)
+    _, sat_mask = cv2.threshold(sat_blur, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+
+    # grayscale Otsu mask (tissue tends to be darker than background)
+    gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
+    gray_blur = cv2.GaussianBlur(gray, (5, 5), 0)
+    _, gray_mask = cv2.threshold(gray_blur, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+
+    mask = cv2.bitwise_and(sat_mask, gray_mask)
+    mask = cv2.medianBlur(mask, 7)
+    mask = (mask > 0).astype(np.uint8)  # 0/1
+    return mask, scale  # scale: level0 / thumbnail
+
+def tile_generator(slide: openslide.OpenSlide, tile_size: int, stride: int, tissue_ratio_thr: float, mask_max_dim: int):
+    mask, scale = compute_tissue_mask(slide, max_dim=mask_max_dim)
+    w, h = slide.dimensions
+    thumb_h, thumb_w = mask.shape  # note: mask is HxW
+
+    for y in range(0, h - tile_size + 1, stride):
+        for x in range(0, w - tile_size + 1, stride):
+            # map (x,y,tile_size) to thumbnail coords
+            tx0 = int(x / scale)
+            ty0 = int(y / scale)
+            tx1 = int((x + tile_size) / scale)
+            ty1 = int((y + tile_size) / scale)
+            tx0 = max(0, min(tx0, thumb_w - 1))
+            ty0 = max(0, min(ty0, thumb_h - 1))
+            tx1 = max(tx0 + 1, min(tx1, thumb_w))
+            ty1 = max(ty0 + 1, min(ty1, thumb_h))
+
+            patch_mask = mask[ty0:ty1, tx0:tx1]
+            tissue_ratio = patch_mask.mean()
+
+            if tissue_ratio < tissue_ratio_thr:
+                continue
+            yield x, y, tissue_ratio
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--splits_csv", type=str, default="data/metadata/splits_patient.csv")
+    ap.add_argument("--raw_dir", type=str, default="data/raw/tcga_brca_svs")
+    ap.add_argument("--tiles_dir", type=str, default="data/tiles")
+    ap.add_argument("--tile_size", type=int, default=256)
+    ap.add_argument("--stride", type=int, default=256)
+    ap.add_argument("--tissue_ratio_thr", type=float, default=0.5)
+    ap.add_argument("--mask_max_dim", type=int, default=2048)
+    ap.add_argument("--limit_slides", type=int, default=0, help="0 means no limit")
+    args = ap.parse_args()
+
+    df = pd.read_csv(args.splits_csv)
+    tiles_dir = Path(args.tiles_dir)
+    safe_mkdir(tiles_dir)
+
+    manifest_rows = []
+
+    # Build wsi_path by searching in raw_dir/<uuid>/*.svs
+    raw_dir = Path(args.raw_dir)
+    fileid_to_svs = {}
+    for uuid_dir in raw_dir.glob("*"):
+        if not uuid_dir.is_dir():
+            continue
+        svs_files = list(uuid_dir.glob("*.svs"))
+        if len(svs_files) == 1:
+            fileid_to_svs[uuid_dir.name] = svs_files[0]
+        elif len(svs_files) > 1:
+            # pick the first; you can refine later
+            fileid_to_svs[uuid_dir.name] = svs_files[0]
+
+    # slide_id == file_id in our pipeline
+    slide_ids = df["slide_id"].tolist()
+    if args.limit_slides > 0:
+        slide_ids = slide_ids[: args.limit_slides]
+
+    for slide_id in tqdm(slide_ids, desc="extract tiles"):
+        if slide_id not in fileid_to_svs:
+            print(f"[WARN] slide_id {slide_id} not found in raw_dir")
+            continue
+        wsi_path = fileid_to_svs[slide_id]
+        out_slide_dir = tiles_dir / slide_id
+        safe_mkdir(out_slide_dir)
+
+        try:
+            slide = openslide.OpenSlide(str(wsi_path))
+        except Exception as e:
+            print(f"[ERROR] openslide failed: {wsi_path} :: {e}")
+            continue
+
+        for x, y, tissue_ratio in tile_generator(
+            slide,
+            tile_size=args.tile_size,
+            stride=args.stride,
+            tissue_ratio_thr=args.tissue_ratio_thr,
+            mask_max_dim=args.mask_max_dim,
+        ):
+            region = slide.read_region((x, y), 0, (args.tile_size, args.tile_size)).convert("RGB")
+            tile_name = f"{slide_id}__x{x}_y{y}.png"
+            tile_path = out_slide_dir / tile_name
+            region.save(tile_path)
+
+            manifest_rows.append(
+                dict(
+                    slide_id=slide_id,
+                    tile_id=tile_name.replace(".png", ""),
+                    x=x,
+                    y=y,
+                    tile_size=args.tile_size,
+                    stride=args.stride,
+                    tissue_ratio=float(tissue_ratio),
+                    tile_path=str(tile_path),
+                )
+            )
+
+        slide.close()
+
+    meta_dir = Path("data/metadata")
+    safe_mkdir(meta_dir)
+    manifest_csv = meta_dir / "tile_manifest.csv"
+    pd.DataFrame(manifest_rows).to_csv(manifest_csv, index=False)
+    print("Saved tile manifest:", manifest_csv, "n_tiles=", len(manifest_rows))
+
+if __name__ == "__main__":
+    main()

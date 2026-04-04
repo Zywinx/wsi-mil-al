@@ -1,0 +1,26 @@
+# Python 缓存
+__pycache__/
+*.py[cod]
+
+# 屏蔽所有模型权重（最重要）
+*.pt
+*.pth
+*.ckpt
+*.pkl
+
+# 屏蔽所有大型运行结果和备份
+runs/
+backup_*/
+backup_before_normalize/
+backup_stage1/
+
+# 屏蔽大型元数据文件
+# (建议只在 GitHub 保留 splits.csv 这种小文件)
+data/metadata/tile_manifest*
+data/metadata/bag_index.json
+data/raw/
+data/tiles/
+
+# 屏蔽 IDE 和系统文件
+.vscode/
+.DS_Store

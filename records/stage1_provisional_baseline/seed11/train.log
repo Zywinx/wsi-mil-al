@@ -1,0 +1,37 @@
+[2026-04-03 11:14:51,343] INFO - device=cuda:0
+[2026-04-03 11:15:14,801] INFO - device=cuda:0
+[2026-04-03 11:15:43,932] INFO - device=cuda:0
+[2026-04-03 11:16:00,854] INFO - device=cuda:0
+[2026-04-03 11:16:21,433] INFO - device=cuda:0
+[2026-04-03 11:16:37,700] INFO - device=cuda:0
+[2026-04-03 11:17:00,585] INFO - device=cuda:0
+[2026-04-03 11:17:36,195] INFO - device=cuda:0
+[2026-04-03 11:18:00,901] INFO - device=cuda:0
+[2026-04-03 11:18:22,872] INFO - device=cuda:0
+[2026-04-03 11:19:23,169] INFO - device=cuda:0
+[2026-04-03 11:19:52,443] INFO - device=cuda:0
+[2026-04-03 11:20:13,966] INFO - device=cuda:0
+[2026-04-03 11:20:32,063] INFO - device=cuda:0
+[2026-04-03 11:24:10,139] INFO - device=cuda:0
+[2026-04-03 11:24:45,695] INFO - device=cuda:0
+[2026-04-03 11:25:11,672] INFO - device=cuda:0
+[2026-04-03 11:25:36,701] INFO - device=cuda:0
+[2026-04-03 11:25:55,568] INFO - device=cuda:0
+[2026-04-03 11:26:43,489] INFO - device=cuda:0
+[2026-04-03 11:27:01,501] INFO - device=cuda:0
+[2026-04-03 11:27:32,297] INFO - device=cuda:0
+[2026-04-03 11:27:54,066] INFO - device=cuda:0
+[2026-04-03 11:28:14,466] INFO - device=cuda:0
+[2026-04-03 11:28:40,524] INFO - device=cuda:0
+[2026-04-03 11:29:38,578] INFO - device=cuda:0
+[2026-04-03 11:32:51,340] INFO - epoch=1 tr_loss=0.6518 val_loss=5.6983 auc=0.5714 f1=0.6667 sen=1.0000 spe=0.0000
+[2026-04-03 11:35:16,644] INFO - epoch=2 tr_loss=0.4351 val_loss=0.5131 auc=0.8980 f1=0.8235 sen=1.0000 spe=0.5714
+[2026-04-03 11:37:44,626] INFO - epoch=3 tr_loss=0.2054 val_loss=0.6948 auc=0.5102 f1=0.4286 sen=0.4286 spe=0.4286
+[2026-04-03 11:40:02,172] INFO - epoch=4 tr_loss=0.1944 val_loss=0.8255 auc=0.4694 f1=0.0000 sen=0.0000 spe=1.0000
+[2026-04-03 11:42:04,042] INFO - epoch=5 tr_loss=0.2292 val_loss=0.6466 auc=0.8571 f1=0.6667 sen=1.0000 spe=0.0000
+[2026-04-03 11:44:17,285] INFO - epoch=6 tr_loss=0.2369 val_loss=1.3847 auc=0.0612 f1=0.1333 sen=0.1429 spe=0.0000
+[2026-04-03 11:46:20,138] INFO - epoch=7 tr_loss=0.0823 val_loss=0.7844 auc=0.5510 f1=0.6316 sen=0.8571 spe=0.1429
+[2026-04-03 11:48:17,302] INFO - epoch=8 tr_loss=0.1978 val_loss=0.8195 auc=0.8571 f1=0.2500 sen=0.1429 spe=1.0000
+[2026-04-03 11:50:06,223] INFO - epoch=9 tr_loss=0.1322 val_loss=0.9176 auc=0.2245 f1=0.3529 sen=0.4286 spe=0.0000
+[2026-04-03 11:51:53,197] INFO - epoch=10 tr_loss=0.1033 val_loss=0.7902 auc=0.3061 f1=0.3333 sen=0.2857 spe=0.5714
+[2026-04-03 11:51:54,244] INFO - best_auc=0.8980
