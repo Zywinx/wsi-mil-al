@@ -17,7 +17,7 @@ def main():
     # 正确逻辑
     required = {"slide_id", "label", "patient_id"}
     if not required.issubset(df.columns):
-    df["slide_id"] = df["file_id"].astype(str)
+        df["slide_id"] = df["file_id"].astype(str)
 
     # We define slide_id = file_id (unique & stable) for engineering simplicity
     df["slide_id"] = df["file_id"].astype(str)
