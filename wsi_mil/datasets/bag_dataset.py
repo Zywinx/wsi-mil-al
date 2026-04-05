@@ -1,4 +1,5 @@
 import random
+import logging
 from dataclasses import dataclass
 from typing import Dict, List, Any
 
@@ -86,6 +87,7 @@ class SlideBagDataset(Dataset):
 
     def _sample_tile_records(self, tile_records: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         if len(tile_records) == 0:
+            logging.warning(f"Empty bag detected with 0 tiles for slide")
             return []
         if len(tile_records) >= self.bag_size:
             return self.rng.sample(tile_records, self.bag_size)
@@ -109,8 +111,11 @@ class SlideBagDataset(Dataset):
 
         # === [修改逻辑]: 根据 full_bag 和 split 决定采样策略 ===
         if self.full_bag:
-            # 评估/推理模式下，直接使用该 WSI 的所有切块（不截断）
-            sampled = item.tile_records
+            # 评估/推理模式下，使用确定性排序的所有切块
+            sampled = sorted(
+                item.tile_records,
+                key=lambda r: (int(r["y"]), int(r["x"]), str(r["tile_path"]))
+            )
         elif self.split == "train":
             # 训练模式下，进行随机采样或补齐
             sampled = self._sample_tile_records(item.tile_records)
@@ -130,6 +135,7 @@ class SlideBagDataset(Dataset):
                 "tile_paths": tile_paths,
                 "coords": coords,
                 "tile_records": sampled,  # 保留完整记录供外部使用
+                "n_tiles_total": len(item.tile_records),  # 新增：总tile数量
             }
             # 返回空 tensor 作为占位，实际图像在外部分块加载
             return torch.empty(0), label, meta
@@ -154,5 +160,6 @@ class SlideBagDataset(Dataset):
             "patient_id": item.patient_id,
             "tile_paths": tile_paths,
             "coords": coords,
+            "n_tiles_total": len(item.tile_records),  # 新增：总tile数量
         }
         return bag_imgs, label, meta

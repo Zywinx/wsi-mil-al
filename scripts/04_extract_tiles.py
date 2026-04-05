@@ -69,7 +69,9 @@ def main():
     assert 0 <= args.shard_rank < args.num_shards, "shard_rank must be in [0, num_shards)"
 
     df = pd.read_csv(args.splits_csv)
-    slide_ids = df["slide_id"].astype(str).tolist()
+    
+    # [修改点 1] 增加 sorted()，保证全局顺序绝对固定，避免分布式节点间的分配漂移
+    slide_ids = sorted(df["slide_id"].astype(str).tolist())
 
     if args.limit_slides > 0:
         slide_ids = slide_ids[: args.limit_slides]
@@ -121,6 +123,7 @@ def main():
                 # smaller compression = faster write, same pixels
                 region.save(tile_path, compress_level=1)
 
+                # [修改点 2] 在此字典中补充 source_wsi ；tile_size 已经存在
                 manifest_rows.append(
                     dict(
                         slide_id=slide_id,
@@ -130,6 +133,7 @@ def main():
                         tile_size=args.tile_size,
                         stride=args.stride,
                         tissue_ratio=ratio,
+                        source_wsi=str(svs_path),
                         tile_path=str(tile_path),
                     )
                 )
@@ -137,11 +141,14 @@ def main():
 
         slide.close()
 
+    # [修改点 3] 避免并发写坏文件。如果是 shard 任务，自动给输出文件名打上 shard 标签
     manifest_csv = Path(args.manifest_csv)
+    if args.num_shards > 1:
+        manifest_csv = manifest_csv.parent / f"{manifest_csv.stem}_shard{args.shard_rank}{manifest_csv.suffix}"
+        
     manifest_csv.parent.mkdir(parents=True, exist_ok=True)
     pd.DataFrame(manifest_rows).to_csv(manifest_csv, index=False)
     print("Saved:", manifest_csv, "n_rows=", len(manifest_rows))
-
 
 if __name__ == "__main__":
     main()

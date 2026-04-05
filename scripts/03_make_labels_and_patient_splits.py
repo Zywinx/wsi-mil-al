@@ -14,13 +14,18 @@ def main():
     args = ap.parse_args()
 
     df = pd.read_csv(args.slides_csv)
-    # 正确逻辑
+    
+    # 检查必需列
     required = {"slide_id", "label", "patient_id"}
-    if not required.issubset(df.columns):
-        df["slide_id"] = df["file_id"].astype(str)
-
-    # We define slide_id = file_id (unique & stable) for engineering simplicity
-    df["slide_id"] = df["file_id"].astype(str)
+    missing = required - set(df.columns)
+    if missing:
+        if "slide_id" in missing and "file_id" in df.columns:
+            # 只在缺少 slide_id 且有 file_id 时补上
+            df["slide_id"] = df["file_id"].astype(str)
+            missing.discard("slide_id")
+        
+        if missing:
+            raise ValueError(f"缺少必需列: {missing}")
 
     # Patient-level split with GroupShuffleSplit
     gss1 = GroupShuffleSplit(n_splits=1, train_size=args.train_ratio, random_state=args.seed)
@@ -46,7 +51,28 @@ def main():
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out.to_csv(out_path, index=False)
 
-    print("Split sizes:", out["split"].value_counts().to_dict())
+    # 输出统计信息
+    print("=== Split sizes ===")
+    print(out["split"].value_counts().to_dict())
+    
+    print("\n=== Split × Label statistics ===")
+    split_label_stats = pd.crosstab(out["split"], out["label"])
+    print(split_label_stats)
+    
+    print("\n=== Unique patients per split ===")
+    patient_stats = out.groupby("split")["patient_id"].nunique()
+    print(patient_stats.to_dict())
+    
+    # Fail-fast: 检查 val/test 是否单类
+    val_labels = out[out["split"] == "val"]["label"].unique()
+    test_labels = out[out["split"] == "test"]["label"].unique()
+    
+    if len(val_labels) <= 1:
+        raise ValueError(f"Val set only has {len(val_labels)} class(es): {val_labels}")
+    if len(test_labels) <= 1:
+        raise ValueError(f"Test set only has {len(test_labels)} class(es): {test_labels}")
+    
+    print("\n=== Validation passed ===")
     print("Saved:", out_path)
 
 if __name__ == "__main__":
