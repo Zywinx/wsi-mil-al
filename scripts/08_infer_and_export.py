@@ -102,7 +102,7 @@ def main():
         # 分块提特征
         for X, batch_meta in tile_loader:
             X = X.to(device, non_blocking=True)
-            with autocast(device_type='cuda', enabled=cfg["train"]["amp"]):
+            with autocast( enabled=cfg["train"]["amp"]):
                 chunk_feat = model.encoder(X) 
             features_list.append(chunk_feat.cpu())
             
@@ -117,7 +117,7 @@ def main():
         # 拼接整图特征过 MIL 头
         full_features = torch.cat(features_list, dim=0).unsqueeze(0).to(device)
         
-        with autocast(device_type='cuda', enabled=cfg["train"]["amp"]):
+        with autocast( enabled=cfg["train"]["amp"]):
             outputs = model.mil(full_features)
             slide_logit = outputs[0]
             attention_weights = outputs[1] if len(outputs) > 1 else None 

@@ -33,6 +33,15 @@ from wsi_mil.models.wsi_mil_model import WSIBaselineMIL
 from wsi_mil.utils.vis import save_topk_mosaic
 from wsi_mil.datasets.bag_dataset import build_transforms
 
+def load_attention_weights(attention_dir, slide_id):
+    """加载08脚本导出的attention权重"""
+    if not attention_dir:
+        return None
+    attn_file = Path(attention_dir) / f"{slide_id}_attn.pt"
+    if attn_file.exists():
+        return torch.load(attn_file, map_location="cpu")
+    return None
+
 class SlideTileDataset(torch.utils.data.Dataset):
     def __init__(self, tile_records, transform):
         self.tile_records = tile_records
@@ -60,13 +69,13 @@ def infer_slide_all_tiles(model, tile_records, device, img_size: int, tile_bs: i
     
     for X in tile_loader:
         X = X.to(device, non_blocking=True)
-        with autocast(device_type='cuda', enabled=True):
+        with autocast( enabled=True):
             zb = model.encoder(X)
         z_list.append(zb.cpu())
     
     z = torch.cat(z_list, dim=0).unsqueeze(0).to(device)
     
-    with autocast(device_type='cuda', enabled=True):
+    with autocast( enabled=True):
         slide_logit, alpha, h, e = model.mil(z)
         slide_prob = torch.sigmoid(slide_logit).item()
         
@@ -87,6 +96,7 @@ def main():
     ap.add_argument("--topk", type=int, default=16)
     ap.add_argument("--tile_bs", type=int, default=64)
     ap.add_argument("--wsi_dir", type=str, default=None, help="原始WSI目录，用于绘制Overlay热力图") 
+    ap.add_argument("--attn_dir", type=str, default=None, help="如果提供，则直接读取08导出的Attention，跳过模型推理") 
     ap.add_argument("--device", type=str, default="cuda:0")
     args = ap.parse_args()
 
@@ -122,7 +132,24 @@ def main():
         if len(tile_records) == 0:
             continue
             
-        slide_prob, alpha, _e = infer_slide_all_tiles(model, tile_records, device, cfg["data"]["img_size"], args.tile_bs, num_workers)
+        # --- 核心改进：Attention 缓存与降级推理 ---
+        alpha = None
+        slide_prob = None
+        
+        # 1. 尝试从 08 的产出中直接读取
+        if args.attn_dir:
+            saved_data = load_attention_weights(args.attn_dir, slide_id)
+            if saved_data:
+                alpha = saved_data["attention"].numpy()
+                slide_prob = saved_data["prob"]
+                print(f"✅ 使用缓存的 Attention: {slide_id}")
+        
+        # 2. 降级：如果没有提供目录，或者文件不存在（比如这是张新切片），则启动重新推理
+        if alpha is None:
+            print(f"⚡ 重新推理 Attention: {slide_id}")
+            slide_prob, alpha, _e = infer_slide_all_tiles(
+                model, tile_records, device, cfg["data"]["img_size"], args.tile_bs, num_workers
+            )
 
         # 1. 导出 Top-K Mosaic
         idx = np.argsort(-alpha)[: args.topk]
